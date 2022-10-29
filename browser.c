@@ -1,7 +1,5 @@
 /* CSCI-4061 Fall 2022 – Project #2
- * Group Member #1: Rebecca Hoff hoff1542
- * Group Member #2: Ji Moua moua0345
- * Group Member #3: Aidan Boyle boyle181 */
+ * Aidan Boyle boyle181 */
 
 #include "wrapper.h"
 #include "util.h"
@@ -25,7 +23,7 @@ int num_fav = 0;                     // # favorites
 
 typedef struct tab_list {
   int free; // 0 = false, 1 = true
-  int pid; // may or may not be useful
+  int pid; 
 } tab_list;
 
 // Tab bookkeeping
@@ -73,7 +71,7 @@ void init_tabs () {
 /***********************************/
 
 // return 0 if favorite is ok, -1 otherwise
-// both max limit, already a favorite (Hint: see util.h) return -1
+// both max limit, already a favorite return -1
 int fav_ok (char *uri) {
   if (on_favorites(uri)) {      // check if on favorites list (using util.h function)
     alert("Fav exists");
@@ -119,9 +117,8 @@ void init_favorites (char *fname) {
   fclose(fp);
 }
 
-// Make fd non-blocking just as in class!
+// Make fd non-blocking
 // Return 0 if ok, -1 otherwise
-// Really a util but I want you to do it :-)
 int non_block_pipe (int fd) {
   int nFlags;
   
@@ -137,7 +134,7 @@ int non_block_pipe (int fd) {
 /***********************************/
 
 // Checks if tab is bad and url violates constraints; if so, return.
-// Otherwise, send NEW_URI_ENTERED command to the tab on inbound pipe
+// Otherwise, sends NEW_URI_ENTERED command to the tab on inbound pipe
 void handle_uri (char *uri, int tab_index) {
   if(bad_format(uri) == 1) { // checks for format first, returns early if bad format
     alert("BAD FORMAT");
@@ -165,8 +162,7 @@ void handle_uri (char *uri, int tab_index) {
 
 
 // A URI has been typed in, and the associated tab index is determined
-// If everything checks out, a NEW_URI_ENTERED command is sent (see Hint)
-// Short function
+// If everything checks out, a NEW_URI_ENTERED command is sent
 void uri_entered_cb (GtkWidget* entry, gpointer data) {
   if(data == NULL) {	
     return;
@@ -184,14 +180,13 @@ void uri_entered_cb (GtkWidget* entry, gpointer data) {
 
 
 // Called when + tab is hit
-// Check tab limit ... if ok then do some heavy lifting (see comments)
+// Check tab limit, if ok then do some heavy lifting
 // Create new tab process with pipes
-// Long function
 void new_tab_created_cb (GtkButton *button, gpointer data) {
   if (data == NULL) {
     return;
   }
-  // at tab limit?
+  // Checks tab limit
   if (get_num_tabs() >= MAX_TABS) {           // counts tabs using get_num_tabs
     alert("MAX TABS REACHED.");
     return;
@@ -212,10 +207,6 @@ void new_tab_created_cb (GtkButton *button, gpointer data) {
   // fork and create new render tab
   pid_t tab_process = fork();
 
-  // Note: render has different arguments now: tab_index, both pairs of pipe fd's
-  // (inbound then outbound) -- this last argument will be 4 integers "a b c d"
-  // Hint: stringify args
-
   // Controller parent just does some TABS bookkeeping
   if(tab_process == -1) { //error checking
     perror("fork() failed");
@@ -232,17 +223,13 @@ void new_tab_created_cb (GtkButton *button, gpointer data) {
   }
 }
 
-// This is called when a favorite is selected for rendering in a tab
-// Hint: you will use handle_uri ...
-// However: you will need to first add "https://" to the uri so it can be rendered
+// Called when a favorite is selected for rendering in a tab
 // as favorites strip this off for a nicer looking menu
-// Short
 void menu_item_selected_cb (GtkWidget *menu_item, gpointer data) {
   if (data == NULL) {
     return;
   }
   
-  // Note: For simplicity, currently we assume that the label of the menu_item is a valid url
   // get basic uri
   char *basic_uri = (char *)gtk_menu_item_get_label(GTK_MENU_ITEM(menu_item));
 
@@ -250,17 +237,14 @@ void menu_item_selected_cb (GtkWidget *menu_item, gpointer data) {
   char uri[MAX_URL];
   sprintf(uri, "https://%s", basic_uri);
 
-  // Get the tab (hint: wrapper.h)
+  // Get the tab
   int tab_num = query_tab_id_for_request(menu_item, data);
 
-  // Hint: now you are ready to handle_the_uri
   handle_uri(uri, tab_num);
   return;
 }
 
-
-// BIG CHANGE: the controller now runs an loop so it can check all pipes
-// Long function
+// Runs the controller
 int run_control() {
   browser_window * b_window = NULL;
   int i, nRead;
@@ -277,14 +261,14 @@ int run_control() {
     process_single_gtk_event();
     // Loop across all pipes from VALID tabs -- starting from 0
     for (i=0; i<MAX_TABS; i++) {
-      // Read from all tab pipes including private pipe (index 0)
+      // Read from all tab pipes
       if (TABS[i].free) continue;
       nRead = read(comm[i].outbound[0], &req, sizeof(req_t));  
 
       // Check that nRead returned something before handling cases
       if(nRead == -1 && errno == EAGAIN) continue;
 
-      // // Case 1: PLEASE_DIE
+      // PLEASE_DIE
       if (req.type == PLEASE_DIE) {     
 
         if (i == 0) {
@@ -306,7 +290,7 @@ int run_control() {
         close(comm[i].inbound[1]);
       }
       
-      // // Case 2: TAB_IS_DEAD
+      // TAB_IS_DEAD
       if (req.type == TAB_IS_DEAD) {   // TAB_IS_DEAD: tab has exited
         req_t TID_req;
         TID_req.type = PLEASE_DIE;
@@ -321,7 +305,7 @@ int run_control() {
       }
 
 
-      // Case 3: IS_FAV
+      // IS_FAV
       if (req.type == 1) {
         if (fav_ok(req.uri) == 0) {
           update_favorites_file(req.uri);  
@@ -347,6 +331,7 @@ int main(int argc, char **argv)
 
   // init blacklist (see util.h), and favorites (write this, see above)
   
+  // Fork controller
   int status;
   pid_t child = fork();
   if (child < 0){
@@ -369,8 +354,5 @@ int main(int argc, char **argv)
     }
     exit(0);
   }
-  // Fork controller
-  // Child creates a pipe for itself comm[0]
-  // then calls run_control ()
-  // Parent waits ...
+  
 }
